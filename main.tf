@@ -182,7 +182,7 @@ resource "azurerm_virtual_machine_extension" "proxynoauth" {
   settings = jsonencode({
     "fileUris": [
       "https://raw.githubusercontent.com/tshaiman/proxy-simulation/main/scripts/squid/noauth.sh",
-      "https://raw.githubusercontent.com/tshaiman/proxy-simulation/main/scripts/squid/squid-noauth.conf"
+      "https://raw.githubusercontent.com/tshaiman/proxy-simulation/main/scripts/config/squid-noauth.conf"
     ],
     "commandToExecute": "sudo bash ./noauth.sh"
   })
