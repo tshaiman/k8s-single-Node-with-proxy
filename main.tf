@@ -93,6 +93,19 @@ resource "azurerm_public_ip" "proxynoauth" {
   allocation_method   = "Dynamic"
 }
 
+resource "azurerm_public_ip" "proxybasicauth" {
+  name                = join("-", [var.prefix, "proxybasicauthpip"])
+  resource_group_name = azurerm_resource_group.common.name
+  location            = azurerm_resource_group.common.location
+  allocation_method   = "Dynamic"
+}
+
+resource "azurerm_public_ip" "proxycertauth" {
+  name                = join("-", [var.prefix, "proxycertauthpip"])
+  resource_group_name = azurerm_resource_group.common.name
+  location            = azurerm_resource_group.common.location
+  allocation_method   = "Dynamic"
+}
 
 resource "azurerm_public_ip" "cluster" {
   name                = join("-", [var.prefix, "clusterpip"])
@@ -114,8 +127,44 @@ resource "azurerm_network_interface" "proxynoauth" {
   }
 }
 
+resource "azurerm_network_interface" "proxybasicauth" {
+  name                = join("-", [var.prefix, "proxybasicauthnic"])
+  location            = azurerm_resource_group.common.location
+  resource_group_name = azurerm_resource_group.common.name
+
+  ip_configuration {
+    name                          = "configuration1"
+    subnet_id                     = azurerm_subnet.common.id
+    private_ip_address_allocation = "Dynamic"
+    public_ip_address_id          = azurerm_public_ip.proxybasicauth.id
+  }
+}
+
+resource "azurerm_network_interface" "proxycertauth" {
+  name                = join("-", [var.prefix, "proxycertauthnic"])
+  location            = azurerm_resource_group.common.location
+  resource_group_name = azurerm_resource_group.common.name
+
+  ip_configuration {
+    name                          = "configuration1"
+    subnet_id                     = azurerm_subnet.common.id
+    private_ip_address_allocation = "Dynamic"
+    public_ip_address_id          = azurerm_public_ip.proxycertauth.id
+  }
+}
+
 resource "azurerm_network_interface_security_group_association" "proxynoauth" {
   network_interface_id      = azurerm_network_interface.proxynoauth.id
+  network_security_group_id = azurerm_network_security_group.common.id
+}
+
+resource "azurerm_network_interface_security_group_association" "proxybasicauth" {
+  network_interface_id      = azurerm_network_interface.proxybasicauth.id
+  network_security_group_id = azurerm_network_security_group.common.id
+}
+
+resource "azurerm_network_interface_security_group_association" "proxycertauth" {
+  network_interface_id      = azurerm_network_interface.proxycertauth.id
   network_security_group_id = azurerm_network_security_group.common.id
 }
 
@@ -172,6 +221,76 @@ resource "azurerm_virtual_machine" "proxynoauth" {
   }
 }
 
+resource "azurerm_virtual_machine" "proxybasicauth" {
+  name                  = join("-", [var.prefix, "proxybasicauthvm"])
+  location              = azurerm_resource_group.common.location
+  resource_group_name   = azurerm_resource_group.common.name
+  network_interface_ids = [azurerm_network_interface.proxybasicauth.id]
+  vm_size               = "Standard_B2ms"
+
+  storage_image_reference {
+    publisher = "Canonical"
+    offer     = "UbuntuServer"
+    sku       = "18.04-LTS"
+    version   = "latest"
+  }
+
+  storage_os_disk {
+    name              = "basicauthdisk"
+    caching           = "ReadWrite"
+    create_option     = "FromImage"
+    managed_disk_type = "Standard_LRS"
+  }
+
+  os_profile {
+    computer_name  = "proxybasicauth"
+    admin_username = "azureuser"
+  }
+
+  os_profile_linux_config {
+    disable_password_authentication = true
+    ssh_keys {
+      key_data  = file(var.publickeypath)
+      path      = "/home/azureuser/.ssh/authorized_keys"
+    }
+  }
+}
+
+resource "azurerm_virtual_machine" "proxycertauth" {
+  name                  = join("-", [var.prefix, "proxycertauthvm"])
+  location              = azurerm_resource_group.common.location
+  resource_group_name   = azurerm_resource_group.common.name
+  network_interface_ids = [azurerm_network_interface.proxycertauth.id]
+  vm_size               = "Standard_B2ms"
+
+  storage_image_reference {
+    publisher = "Canonical"
+    offer     = "UbuntuServer"
+    sku       = "18.04-LTS"
+    version   = "latest"
+  }
+
+  storage_os_disk {
+    name              = "certauthdisk"
+    caching           = "ReadWrite"
+    create_option     = "FromImage"
+    managed_disk_type = "Standard_LRS"
+  }
+
+  os_profile {
+    computer_name  = "proxycertauth"
+    admin_username = "azureuser"
+  }
+
+  os_profile_linux_config {
+    disable_password_authentication = true
+    ssh_keys {
+      key_data  = file(var.publickeypath)
+      path      = "/home/azureuser/.ssh/authorized_keys"
+    }
+  }
+}
+
 resource "azurerm_virtual_machine_extension" "proxynoauth" {
   name                 = join("-", [var.prefix, "noauthextension"])
   virtual_machine_id   = azurerm_virtual_machine.proxynoauth.id
@@ -181,10 +300,43 @@ resource "azurerm_virtual_machine_extension" "proxynoauth" {
 
   settings = jsonencode({
     "fileUris": [
-      "https://raw.githubusercontent.com/tshaiman/proxy-simulation/main/scripts/squid/noauth.sh",
-      "https://raw.githubusercontent.com/tshaiman/proxy-simulation/main/scripts/config/squid-noauth.conf"
+      "https://raw.githubusercontent.com/tshaiman/k8s-single-Node-with-proxy/main/scripts/squid/noauth.sh",
+      "https://raw.githubusercontent.com/tshaiman/k8s-single-Node-with-proxy/main/scripts/config/squid-noauth.conf"
     ],
     "commandToExecute": "sudo bash ./noauth.sh"
+  })
+}
+
+resource "azurerm_virtual_machine_extension" "proxybasicauth" {
+  name                 = join("-", [var.prefix, "basicauthextension"])
+  virtual_machine_id   = azurerm_virtual_machine.proxybasicauth.id
+  publisher            = "Microsoft.Azure.Extensions"
+  type                 = "CustomScript"
+  type_handler_version = "2.0"
+
+  settings = jsonencode({
+    "fileUris": [
+      "https://raw.githubusercontent.com/tshaiman/k8s-single-Node-with-proxy/main/scripts/squid/basicauth.sh",
+      "https://raw.githubusercontent.com/tshaiman/k8s-single-Node-with-proxy/main/scripts/config/squid-basicauth.conf"
+    ],
+    "commandToExecute": "sudo bash ./basicauth.sh"
+  })
+}
+
+resource "azurerm_virtual_machine_extension" "proxycertauth" {
+  name                 = join("-", [var.prefix, "certauthextension"])
+  virtual_machine_id   = azurerm_virtual_machine.proxycertauth.id
+  publisher            = "Microsoft.Azure.Extensions"
+  type                 = "CustomScript"
+  type_handler_version = "2.0"
+
+  settings = jsonencode({
+    "fileUris": [
+      "https://raw.githubusercontent.com/tshaiman/k8s-single-Node-with-proxy/main/scripts/squid/certauth.sh",
+      "https://raw.githubusercontent.com/tshaiman/k8s-single-Node-with-proxy/main/scripts/config/squid-certauth.conf"
+    ],
+    "commandToExecute": join(" ", ["sudo bash ./certauth.sh", azurerm_network_interface.proxycertauth.private_ip_address])
+
   })
 }
 
@@ -234,7 +386,7 @@ resource "azurerm_virtual_machine_extension" "cluster" {
 
   settings = jsonencode({
     "fileUris": [
-      "https://raw.githubusercontent.com/tshaiman/proxy-simulation/main/scripts/cluster/main.sh"
+      "https://raw.githubusercontent.com/tshaiman/k8s-single-Node-with-proxy/main/scripts/cluster/main.sh"
     ],
     "commandToExecute": join(" ", ["sudo bash ./main.sh", azurerm_network_interface.proxynoauth.private_ip_address ])
   })
