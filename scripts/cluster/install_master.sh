@@ -16,7 +16,7 @@ if [ "$DISTRIB_RELEASE" != "20.04" ]; then
     read
 fi
 
-KUBE_VERSION=1.26.1
+KUBE_VERSION=1.27.3
 
 
 ### setup terminal
@@ -62,8 +62,10 @@ EOF
 
 
 ### install packages
-curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
-echo "deb [trusted=yes] https://apt.kubernetes.io/ kubernetes-xenial main" | sudo tee /etc/apt/sources.list.d/kubernetes.list
+apt-get install -y apt-transport-https ca-certificates
+mkdir -p /etc/apt/keyrings
+curl -fsSL https://dl.k8s.io/apt/doc/apt-key.gpg | sudo gpg --yes --dearmor -o /etc/apt/keyrings/kubernetes-archive-keyring.gpg
+echo "deb [signed-by=/etc/apt/keyrings/kubernetes-archive-keyring.gpg] https://apt.kubernetes.io/ kubernetes-xenial main" | sudo tee /etc/apt/sources.list.d/kubernetes.list
 apt-get --allow-unauthenticated update
 apt-get --allow-unauthenticated install -y docker.io containerd kubelet=${KUBE_VERSION}-00 kubeadm=${KUBE_VERSION}-00 kubectl=${KUBE_VERSION}-00 kubernetes-cni
 apt-mark hold kubelet kubeadm kubectl kubernetes-cni
@@ -144,7 +146,7 @@ EOF
 ### kubelet should use containerd
 {
 cat <<EOF | sudo tee /etc/default/kubelet
-KUBELET_EXTRA_ARGS="--container-runtime remote --container-runtime-endpoint unix:///run/containerd/containerd.sock"
+KUBELET_EXTRA_ARGS="--container-runtime-endpoint unix:///run/containerd/containerd.sock"
 EOF
 }
 
@@ -165,7 +167,7 @@ mkdir -p ~/.kube
 sudo cp -i /etc/kubernetes/admin.conf ~/.kube/config
 
 ### CNI
-kubectl apply -f https://raw.githubusercontent.com/tshaiman/proxy-simulation/main/scripts/cluster/calico.sh
+kubectl apply -f https://raw.githubusercontent.com/tshaiman/proxy-simulation/main/scripts/cluster/calico.yaml
 
 # etcdctl
 ETCDCTL_VERSION=v3.5.1
@@ -175,3 +177,7 @@ wget https://github.com/etcd-io/etcd/releases/download/${ETCDCTL_VERSION}/${ETCD
 tar xzf ${ETCDCTL_VERSION_FULL}.tar.gz ${ETCDCTL_VERSION_FULL}/etcdctl
 mv ${ETCDCTL_VERSION_FULL}/etcdctl /usr/bin/
 rm -rf ${ETCDCTL_VERSION_FULL} ${ETCDCTL_VERSION_FULL}.tar.gz
+
+echo
+echo "### COMMAND TO ADD A WORKER NODE ###"
+kubeadm token create --print-join-command --ttl 0

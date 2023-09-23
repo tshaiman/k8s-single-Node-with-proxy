@@ -6,7 +6,7 @@ export SQUID_NOAUTH_IP=$1
 echo "Deploy K8s Single Node KubeAdm cluster"
 #########################################
 sudo -i
-bash <(curl -s https://raw.githubusercontent.com/killer-sh/cks-course-environment/master/cluster-setup/latest/install_master.sh)
+bash <(curl -s https://raw.githubusercontent.com/tshaiman/k8s-single-Node-with-proxy/main/scripts/cluster/install_master.sh)
 
 echo "Remove Taints on master node"
 kubectl taint nodes --all node-role.kubernetes.io/control-plane-
