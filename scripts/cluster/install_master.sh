@@ -16,7 +16,7 @@ if [ "$DISTRIB_RELEASE" != "20.04" ]; then
     read
 fi
 
-KUBE_VERSION=1.27.3
+KUBE_VERSION=1.28.2
 
 
 ### setup terminal
@@ -50,8 +50,8 @@ systemctl daemon-reload
 
 ### install podman
 . /etc/os-release
-echo "deb https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_${VERSION_ID}/ /" | sudo tee /etc/apt/sources.list.d/devel:kubic:libcontainers:testing.list
-curl -L "https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_${VERSION_ID}/Release.key" | sudo apt-key add -
+echo "deb http://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_${VERSION_ID}/ /" | sudo tee /etc/apt/sources.list.d/devel:kubic:libcontainers:testing.list
+curl -L "http://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_${VERSION_ID}/Release.key" | sudo apt-key add -
 apt-get update -qq
 apt-get -qq -y install podman cri-tools containers-common
 rm /etc/apt/sources.list.d/devel:kubic:libcontainers:testing.list
@@ -64,10 +64,15 @@ EOF
 ### install packages
 apt-get install -y apt-transport-https ca-certificates
 mkdir -p /etc/apt/keyrings
-curl -fsSL https://dl.k8s.io/apt/doc/apt-key.gpg | sudo gpg --yes --dearmor -o /etc/apt/keyrings/kubernetes-archive-keyring.gpg
-echo "deb [signed-by=/etc/apt/keyrings/kubernetes-archive-keyring.gpg] https://apt.kubernetes.io/ kubernetes-xenial main" | sudo tee /etc/apt/sources.list.d/kubernetes.list
+rm /etc/apt/keyrings/kubernetes-1-27-apt-keyring.gpg || true
+rm /etc/apt/keyrings/kubernetes-1-28-apt-keyring.gpg || true
+curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.27/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-1-27-apt-keyring.gpg
+curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.28/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-1-28-apt-keyring.gpg
+echo > /etc/apt/sources.list.d/kubernetes.list
+echo "deb [signed-by=/etc/apt/keyrings/kubernetes-1-27-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.27/deb/ /" | sudo tee -a /etc/apt/sources.list.d/kubernetes.list
+echo "deb [signed-by=/etc/apt/keyrings/kubernetes-1-28-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.28/deb/ /" | sudo tee -a /etc/apt/sources.list.d/kubernetes.list
 apt-get --allow-unauthenticated update
-apt-get --allow-unauthenticated install -y docker.io containerd kubelet=${KUBE_VERSION}-00 kubeadm=${KUBE_VERSION}-00 kubectl=${KUBE_VERSION}-00 kubernetes-cni
+apt-get --allow-unauthenticated install -y docker.io containerd kubelet=${KUBE_VERSION}-1.1 kubeadm=${KUBE_VERSION}-1.1 kubectl=${KUBE_VERSION}-1.1 kubernetes-cni
 apt-mark hold kubelet kubeadm kubectl kubernetes-cni
 
 
@@ -167,7 +172,8 @@ mkdir -p ~/.kube
 sudo cp -i /etc/kubernetes/admin.conf ~/.kube/config
 
 ### CNI
-kubectl apply -f https://raw.githubusercontent.com/tshaiman/proxy-simulation/main/scripts/cluster/calico.yaml
+kubectl apply -f https://raw.githubusercontent.com/killer-sh/cks-course-environment/master/cluster-setup/calico.yaml
+
 
 # etcdctl
 ETCDCTL_VERSION=v3.5.1
